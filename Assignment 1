@@ -1,0 +1,452 @@
+''' write PCA MAP and ML calssifier'''
+import numpy as np
+from sympy import *
+import matplotlib.pyplot as plt
+import struct
+import random
+import os
+from scipy import interpolate
+from matplotlib.patches import Ellipse, Circle
+import pandas as pd
+import math
+# question 1
+def function1(ae):
+    X = np.random.multivariate_normal([0, 0], ae, 1000) 
+    #generate the data accroding to the covariance matrices
+    eigenvalue,eigenvector = np.linalg.eig(ae)
+    x1 = X[:,0]
+    x2 = X[:,1] 
+    #contour of the first standard deviation  is a oval determined by the eigenvalue and eigenvector
+    ell1 = Ellipse(xy=(0.0, 0.0), label = 'contour of standard deviation',width= eigenvalue[0], height = eigenvalue[1],angle=math.degrees(math.atan2(eigenvector[1][0],eigenvector[1][1])), facecolor='yellow',alpha=0.3)
+    #print the shape of the oval
+    plt.plot(X[:, 0], X[:, 1], '.',zorder = 0,label = 'data sample')
+    ax = plt.gca()
+    ax.add_artist(ell1)
+    plt.axis('equal')
+    plt.title("data samples \n covariance matrices is %s"%(ae))
+    plt.legend()
+    plt.show()
+    covx1 = np.mean((x1 - x1.mean()) * (x1 - x1.mean()))
+    #calculate the covariance matrices
+    covx2 = np.mean((x1 - x1.mean()) * (x2 - x2.mean()))
+    covx4 = np.mean((x2 - x2.mean()) * (x2 - x2.mean()))
+    print([covx1,covx2],[covx2,covx4],x1.mean(),x2.mean())
+function1([[2,-2],[-2,3]])
+function1([[1,0],[0,1]])
+# question 2a
+#we can calculate the boundary of different classes
+
+def c1(x,y):
+    # the united distribution function of the sample (x,y) in class1
+    res = (1 / (2 *math.pi)) * exp(-1 * np.square(x - 3) - 0.5 * np.square(y - 2) - (x - 3) * (y - 2))
+    return res
+def c2(x,y):
+    # the united distribution function of the sample (x,y) in class2
+    res = (1 / (2 *math.pi)) * exp(-1 * np.square(x - 5) - 0.5 * np.square(y - 4) - (x - 5) * (y - 4))
+    return res
+def c3(x,y):
+    # the united distribution function of the sample (x,y) in class2
+    res = (1 / ( math.sqrt(5) * math.pi )) * exp((-3 / 5) *(2 * np.square(x - 2) + (1 / 3) * np.square(y-5) - (2 / 3)*(x - 2) * (y - 5)))
+    return res
+def questionbplot(c1e,c2e,c3e):#plot the the means and first standard deviation contours
+    eigenvalue1, eigenvectorc1 = np.linalg.eig(c1e)
+    eigenvalue2, eigenvectorc2 = np.linalg.eig(c2e)
+    eigenvalue3, eigenvectorc3 = np.linalg.eig(c3e)
+    plt.plot(3, 2, '.', color ='green', label = 'class1')
+    plt.plot(5, 4, '.', color='red', label = 'class2')
+    plt.plot(2, 5, '.', color='blue', label = 'class3')
+    plt.legend()
+    ell1 = Ellipse(xy = (3,2), width = eigenvalue1[1], fill = false, height = eigenvalue1[0], angle = math.degrees(math.atan2(eigenvectorc1[0][0],eigenvectorc1[0][1])), color= 'green', alpha=0.3)
+    ax = plt.gca()
+    ax.add_artist(ell1)
+    ell2 = Ellipse(xy = (5, 4), width = eigenvalue2[1], fill = false, height = eigenvalue2[0], angle = math.degrees(math.atan2(eigenvectorc2[0][0],eigenvectorc2[0][1])), color= 'red', alpha=0.3)
+    ax = plt.gca()
+    ax.add_artist(ell2)
+    ell3 = Ellipse(xy = (2,5), width = eigenvalue3[0], fill = false, height = eigenvalue3[1], angle = math.degrees(math.atan2(eigenvectorc3[1][0], eigenvectorc3[0][0])), color= 'blue', alpha=0.3)
+    ax = plt.gca()
+    ax.add_artist(ell3)
+    plt.axis([0, 8, 0, 8])
+    plt.show()
+c1e = [[1, -1], [-1, 2]]
+c2e = [[1, -1], [-1, 2]]
+c3e = [[0.5, 0.5], [0.5, 3]]
+questionbplot(c1e,c2e,c3e)
+#question 2b
+#using the ML
+#first generate the data
+
+C1 = np.random.multivariate_normal([3, 2], [[1, -1], [-1, 2]], 600)
+C2 = np.random.multivariate_normal([5, 4], [[1, -1], [-1, 2]], 2100)
+C3 = np.random.multivariate_normal([2, 5], [[0.5, 0.5], [0.5, 3]], 300)
+
+class1 = [[],[]]#divide the sample of class 1 into two arrays
+class2 = [[],[]]#divide the sample of class 2 into two arrays
+class3 = [[],[]]#divide the sample of class 3 into two arrays
+matrix11 = 0 #number of samples in class 1 which is classified as class 1
+matrix12 = 0 #number of samples in class 1 which is classified as class 2
+matrix13 = 0 #number of samples in class 1 which is classified as class 3
+matrix21 = 0 #number of samples in class 2 which is classified as class 1
+matrix22 = 0 #number of samples in class 2 which is classified as class 2
+matrix23 = 0 #number of samples in class 2 which is classified as class 3
+matrix31 = 0 #number of samples in class 3 which is classified as class 1
+matrix32 = 0 #number of samples in class 3 which is classified as class 2
+matrix33 = 0 #number of samples in class 3 which is classified as class 3
+for x, y in zip(C1[:,0],C1[:,1]):
+    if c1(x,y) >= c2(x,y) and c1(x,y) >= c3(x,y):
+        class1[0].append(x)
+        class1[1].append(y)
+        matrix11 += 1
+    elif c1(x, y) < c2(x, y) and c2(x, y) >= c3(x, y):
+        class2[0].append(x)
+        class2[1].append(y)
+        matrix12 += 1
+    elif c1(x, y) < c3(x, y) and c3(x, y) > c2(x, y):
+        class3[0].append(x)
+        class3[1].append(y)
+        matrix13 += 1
+for x, y in zip(C2[:,0],C2[:,1]):
+    if c1(x,y) > c2(x,y) and c1(x,y) > c3(x,y):
+        class1[0].append(x)
+        class1[1].append(y)
+        matrix21 += 1
+    elif c1(x, y) <= c2(x, y) and c2(x, y) >= c3(x, y):
+        class2[0].append(x)
+        class2[1].append(y)
+        matrix22 += 1
+    elif c1(x, y) <= c3(x, y) and c3(x, y) > c2(x, y):
+        class3[0].append(x)
+        class3[1].append(y)
+        matrix23 += 1
+for x, y in zip(C3[:,0],C3[:,1]):
+    if c1(x,y) > c2(x,y) and c1(x,y) > c3(x,y):
+        class1[0].append(x)
+        class1[1].append(y)
+        matrix31 += 1
+    elif c1(x, y) <= c2(x, y) and c2(x, y) >= c3(x, y):
+        class2[0].append(x)
+        class2[1].append(y)
+        matrix32 += 1
+    elif c1(x, y) <= c3(x, y) and c3(x, y) > c2(x, y):
+        class3[0].append(x)
+        class3[1].append(y)
+        matrix33 += 1
+conmatrix = [[matrix11,matrix12,matrix13],[matrix21,matrix22,matrix23],[matrix31,matrix32,matrix33]]
+print(conmatrix)
+plt.plot(class1[0], class1[1], '.',color = 'yellow',zorder = 0,label = 'class1')
+plt.plot(class2[0], class2[1], '.',color = 'red',zorder = 0,label = 'class2')
+plt.plot(class3[0], class3[1], '.',zorder = 0,label = 'class3')
+plt.axis('equal')
+plt.legend()
+plt.savefig('q22')
+plt.show()
+
+#using the map
+
+matrix11 = 0
+matrix12 = 0
+matrix13 = 0
+matrix21 = 0
+matrix22 = 0
+matrix23 = 0
+matrix31 = 0
+matrix32 = 0
+matrix33 = 0
+class1map = [[],[]]
+class2map = [[],[]]
+class3map = [[],[]]
+for x, y in zip(C1[:,0],C1[:,1]):
+    if c1(x,y) >=(7/2)* c2(x,y) and c1(x,y) >= 0.5*c3(x,y):
+        class1map[0].append(x)
+        class1map[1].append(y)
+        matrix11 += 1
+    elif c1(x, y) < (7/2)* c2(x, y) and c2(x, y) >= (1/7)*c3(x, y):
+        class2map[0].append(x)
+        class2map[1].append(y)
+        matrix12 += 1
+    elif c1(x, y) <0.5* c3(x, y) and (1/7)*c3(x, y) > c2(x, y):
+        class3map[0].append(x)
+        class3map[1].append(y)
+        matrix13 += 1
+for x, y in zip(C2[:,0],C2[:,1]):
+    if c1(x,y) >(7/2)* c2(x,y) and c1(x,y) > 0.5*c3(x,y):
+        class1map[0].append(x)
+        class1map[1].append(y)
+        matrix21 += 1
+    elif c1(x, y) <= (7/2)* c2(x, y) and c2(x, y) >= (1/7)*c3(x, y):
+        class2map[0].append(x)
+        class2map[1].append(y)
+        matrix22 += 1
+    elif c1(x, y) < 0.5 * c3(x, y) and (1/7)*c3(x, y) > c2(x, y):
+        class3map[0].append(x)
+        class3map[1].append(y)
+        matrix23 += 1
+for x, y in zip(C3[:,0],C3[:,1]):
+    if c1(x,y) > (7/2)* c2(x,y) and c1(x,y) > 0.5 *c3(x,y):
+        class1map[0].append(x)
+        class1map[1].append(y)
+        matrix31 += 1
+    elif c1(x, y) <= (7/2)* c2(x, y) and c2(x, y) >= (1/7)*c3(x, y):
+        class2map[0].append(x)
+        class2map[1].append(y)
+        matrix32 += 1
+    elif c1(x, y) <= 0.5 * c3(x, y) and (1/7)*c3(x, y) > c2(x, y):
+        class3map[0].append(x)
+        class3map[1].append(y)
+        matrix33 += 1
+conmatrix = [[matrix11,matrix12,matrix13],[matrix21,matrix22,matrix23],[matrix31,matrix32,matrix33]]
+print(conmatrix)
+plt.plot(class1map[0], class1map[1], '.',color = 'yellow',zorder = 0,label = 'class1')
+plt.plot(class2map[0], class2map[1], '.',color = 'red',zorder = 0,label = 'class2')
+plt.plot(class3map[0], class3map[1], '.',zorder = 0,label = 'class3')
+plt.axis('equal')
+plt.legend()
+plt.savefig('q23')
+plt.show()
+
+#question 3
+
+def load_mnist(path, kind='train'):#read the data
+    labels_path = os.path.join(path, '%s-labels.idx1-ubyte' % kind)
+    images_path = os.path.join(path, '%s-images.idx3-ubyte' % kind)
+    with open(labels_path, 'rb') as lbpath:
+        magic, n = struct.unpack('>II', lbpath.read(8))
+        labels = np.fromfile(lbpath, dtype=np.uint8)
+    with open(images_path, 'rb') as imgpath:
+        magic, num, rows, cols = struct.unpack('>IIII', imgpath.read(16))
+        images = np.fromfile(imgpath, dtype=np.uint8).reshape(len(labels), 784)
+    return images, labels
+train_images,train_labels = load_mnist("")
+#question 3a
+def pca(dataset, keepfeture):
+    meanval = dataset.mean(axis=1).T 
+    # The mean value of each value
+    removemean = (dataset.T - meanval).T 
+    # remove the mean value
+    covofdata = np.cov(removemean, rowvar=1)
+    # calculate the covariance matrix
+    eigenvalue, eigenvector = np.linalg.eig(np.mat(covofdata))
+    sortedindex = np.argsort(eigenvalue) 
+    # Get the index of the sorted eigenvalue
+    sortedindexnew = sortedindex[:-(keepfeture + 1): -1]
+    # Get the largest d eigenvalue's index
+    eigenvectornew = eigenvector[:,sortedindexnew]
+    # Selct the eigenvector according to the index and form a matrix
+    eigenvaluenew = eigenvalue[:,sortedindexnew]
+    newmatrix = np.dot(eigenvectornew.T,removemean)
+    # get the Y matrix
+    return newmatrix, eigenvaluenew
+
+#question 3b
+
+def pcapov95(dataset):
+    meanval = dataset.mean(axis=1).T
+    removemean = (dataset.T - meanval).T
+    covofdata = np.cov(removemean, rowvar=1)
+    eigenvalue , eigenvector = np.linalg.eig(np.mat(covofdata))
+    sortedindex = np.argsort(eigenvalue)
+    sumei = sum(eigenvalue)
+    sumy = 0
+    i = -1
+    sortedindexnew = []
+    while sumy / sumei < 0.95:
+        sumy += eigenvalue[sortedindex[i]]
+        i -= 1
+        sortedindexnew.append(sortedindex[i])
+    eigenvectornew = eigenvector[sortedindexnew, :]
+    newmatrix = np.dot(eigenvectornew, removemean)
+    numberofindex = len(sortedindexnew)
+    return numberofindex, newmatrix
+dataset = np.array(train_images).T
+#Since the input feature is D*N we need to do a transpose
+res, newmatrix = pcapov95(dataset)
+print(res)
+
+#question 3c
+
+def pcarec(dataset,keepfeture):
+    meanval = dataset.mean(axis=1).T
+    removemean = (dataset.T - meanval).T
+    covofdata = np.cov(removemean, rowvar=1)
+    eigenvalue , eigenvector = np.linalg.eig(np.mat(covofdata))
+    sortedindex = np.argsort(eigenvalue)
+    sortedindexnew = sortedindex[:-(keepfeture + 1): -1]
+    eigenvectornew = eigenvector[:,sortedindexnew]
+    newmatrix = np.dot(eigenvectornew.T,removemean)
+    reconmat = (np.dot(eigenvectornew,newmatrix).T + meanval).T
+    # reconstruction the origin matrix
+    return reconmat
+dataset = train_images
+matrixmse = []
+xlist = [i for i in range(0,784,20)]
+for i in xlist:
+    #mse calculation
+    mseb = np.array(pcarec(np.array(dataset).T,i))
+    msea = np.array(dataset).T
+    msec = msea - mseb
+    mse = ((msea - mseb)**2).mean(axis=0).mean()
+    matrixmse.append(mse)
+ax = plt.gca()
+ax.set_xlabel('d')
+ax.set_ylabel('mse')
+plt.legend()
+ax.plot(xlist, matrixmse, color='blue', linewidth=1, alpha=0.6)
+plt.show()
+
+#question 3d
+
+def selectfrom (inti,n):
+#This function is used to select the first pictures and its index whoese label is inti from the whole the imagine
+    res = []
+    for i in range (60000) :
+        if train_labels[i] == inti and len(res) < n:
+            res.append(train_images[i])
+            if len(res) == 1:
+                count = i
+    return res,count
+data, num = selectfrom(8,6000)
+xlistq3 = [1, 10, 50, 250, 784]
+for i in xlistq3:
+    res = pcarec(np.array(train_images).T,i)
+    plt.imshow(res[:,num].reshape(28, 28))
+    title = str(i) + '.png'
+    plt.savefig(title)
+    plt.show()
+
+#quesion 3e
+
+xlistq4 = [i for i in range(1,785)]
+dataset = np.array(train_images).T
+covofdata = np.cov(dataset,rowvar=1)
+eigenvalue, eigenvector = np.linalg.eig(covofdata)
+sortedindex = np.argsort(eigenvalue)
+sortedindexnew = sortedindex[:: -1]
+eigenvalue = eigenvalue[sortedindexnew]
+ax = plt.gca()
+ax.set_xlabel('d')
+ax.set_ylabel('eigenvalues')
+ax.plot(xlistq4,eigenvalue)
+plt.show()
+
+#question 4
+
+def loaddata():
+    fname = 'dataset3.txt'
+    with open(fname, 'r+', encoding='utf-8') as f:
+        data = [i[:-1].split(',') for i in f.readlines()]
+    for i in range (len(data)):
+        for j in range (len(data[0])):
+            data[i][j] = float(data[i][j])
+    trainx = []
+    # the feature of each sample
+    trainy = []
+    # the label of each sample
+    for line in data:
+        trainx.append([1.0,line[0],line[1]])
+        # adding constant 1 to each feature
+        trainy.append(line[2])
+    return np.array(trainx), np.array(trainy)
+def seg(x):
+    return 1.0/(1.0+exp(-x))
+def normal(x):
+    # normalize the feature
+    sum_x1 = 0
+    sum_x2 = 0
+    sample_max = np.max(x, axis=0)
+    for sample in x:
+        sum_x1 += sample[1]
+        sum_x2 += sample[2]
+    mean_x1 = sum_x1 / len(x)
+    mean_x2 = sum_x2 / len(x)
+    for sample in x:
+        sample[1] = (sample[1] - mean_x1) / sample_max[1]
+        sample[2] = (sample[2] - mean_x2) / sample_max[2]
+    return x
+def stoc_grad_ascent(x, y, alpha,nepoch):
+    m, n = x.shape
+    indexm = np.ones(n)
+    # use (1,1,1) as the primary theta index
+    costfunciton = []
+    xlist = []
+    for k in range (nepoch):
+        cost = 0
+        for i in range(m):
+            sindex = int(random.uniform(0,m))
+            #randomly generate an index from 0 to m
+            sumx = x[sindex].dot(indexm)
+            # sumx = theta0 + theta1 * x1 + theta2 * x2
+            h = seg(sumx)
+            error = h - y[sindex]
+            a = error * x[sindex]
+            b = np.array(a,dtype=np.float)
+            indexm -= alpha * b
+            # update theta index
+        for j in range (len(x)):
+        #calculate the cost function of each epoch
+            xtheta = x[j].dot(indexm)
+            a = seg(xtheta)
+            if y[j] == 0:
+                cost -= math.log(1-a)
+            else:
+                cost -= math.log(a)
+        cost = cost/100
+        costfunciton.append(cost)
+        xlist.append(k)
+    return indexm, list(xlist), costfunciton
+def predict(x,y,indexm):
+    yinal = []
+    accu = 0
+    for i in range (len(x)):
+        xin = x[i].dot(indexm)
+        if seg(xin) >0.5:
+            yinal.append(1)
+            if y[i] == 1:
+                accu += 1
+        else:
+            yinal.append(0)
+            if y[i] == 0:
+                accu += 1
+    return yinal, accu/100
+def plotfunction(x,y):
+    xlist1 = []
+    ylist1 = []
+    xlist2 = []
+    ylist2 = []
+    for i in range (len(x)):
+        if y[i] == 1:
+            xlist1.append(x[i][1])
+            ylist1.append(x[i][2])
+        else:
+            xlist2.append(x[i][1])
+            ylist2.append(x[i][2])
+    plt.plot(xlist1,ylist1,'.',color='b')
+    plt.plot(xlist2,ylist2,'.',color='r')
+    plt.show()
+def printfuction(x,uy,indexm):
+    y = []
+    ux = np.mean(x)
+    for i in range (len(x)):
+        res = -indexm[0]/indexm[2] - (indexm[1]/indexm[2]) * (x[i] - ux) + uy
+        y.append(res)
+    return y
+x,y = loaddata()
+xnor = normal(x)
+mean = np.mean(y)
+indexm , xlist, costfunction = stoc_grad_ascent(xnor,y,0.01,500)
+ax = plt.gca()
+ax.set_xlabel('epoch')
+ax.set_ylabel('costfunction')
+ax.plot(xlist,costfunction)
+plt.savefig('cost function')
+plt.show()
+yfinal , accurate= predict(xnor,y,indexm)
+yline = printfuction(np.linspace(-0.3,0.3,50,endpoint=False),mean,indexm)
+plotfunction(x,y)
+plotfunction(xnor,yfinal)
+print(accurate)
+bx = plt.gca()
+bx.set_xlabel('x')
+bx.set_ylabel('y')
+bx.plot(np.linspace(-0.3,0.3,50,endpoint=False),yline)
+plt.legend()
+plt.savefig('Decision boundary')
+plt.show()
