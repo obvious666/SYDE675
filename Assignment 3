@@ -1,0 +1,503 @@
+import numpy as np
+import random
+import math
+import copy
+import matplotlib.pyplot as plt
+from sklearn import svm
+from sklearn.ensemble import RandomForestClassifier
+def importdata(loc):
+# to import the data form the local file
+    with open(loc) as f:
+        read_data = f.read()
+        a = read_data.split()
+        data = [[]]
+        for i in range (len(a)):
+            if len(a[i]) == 0:
+                continue
+            tmp = a[i].split(',')
+            if i == 0:
+                tmp[0] = tmp[0][1:]
+            for k in range(2):
+                tmp[k] = float(tmp[k])
+            data[i]+=(tmp)
+            data.append([])
+        return data
+data1 = importdata('hw3_dataset1.csv')
+data2 = importdata('hw3_dataset2.csv')
+#q11
+def plotfun(data,title):
+    # plot the two class to visualize
+    xlist = [[],[]]
+    ylist = [[],[]]
+    for i in data:
+    # divide the dataset accrding to their label
+        if len(i) == 0:
+            continue
+        if i[2] == '1':
+            xlist[0].append(float(i[0]))
+            ylist[0].append(float(i[1]))
+        else:
+            xlist[1].append(float(i[0]))
+            ylist[1].append(float(i[1]))
+    plt.scatter(xlist[0],ylist[0],c='b',label = 'class 1')
+    plt.scatter(xlist[1],ylist[1],c='r',label = 'calss 0')
+    plt.legend()
+    plt.title(title)
+    plt.show()
+#plotfun(data1,'dataset1')
+#plotfun(data2,'dataset2')
+#q12
+def cleandata(data):
+    # to eliminate the empty data in the dataset
+    x = []
+    y = []
+    for i in data:
+        if len(i) == 0:
+            continue
+        x.append([i[0],i[1]])
+        y.append(i[2])
+    return x,y
+def svmdef(data, para,title):
+    x,y = cleandata(data)
+    divisor = svm.SVC(C=para, kernel='linear')
+    #import the classifier
+    divisor.fit(x,y)
+    margin = 1 / np.sqrt((np.sum(divisor.coef_ ** 2)))
+    # calculate the index of the margin
+    coef1 = divisor.coef_[0]
+    coef2 = divisor.intercept_[0]
+    # get the index of the dicision boundary
+    res = divisor.predict(x)
+    res0 = [[],[]]
+    res1 = [[],[]]
+    for i in range (len(res)):
+        if int(res[i]) == 1:
+        # divide the result according to the classified result
+            res1[0].append(x[i][0])
+            res1[1].append(x[i][1])
+        elif int(res[i]) == 0:
+            res0[0].append(x[i][0])
+            res0[1].append(x[i][1])
+    boundaryx = np.linspace(min(res1[0]+res0[0]),max(res1[0]+res0[0]))
+    # get the range of x
+    boundaryy =-(coef1[0]/coef1[1])*boundaryx - coef2/coef1[1]
+    yup = boundaryy + np.sqrt(1 + (-(coef1[0] / coef1[1])) ** 2) * margin
+    # the upper margin of the classifier
+    ydown = boundaryy - np.sqrt(1 + (-(coef1[0] / coef1[1])) ** 2) * margin
+    plt.plot(boundaryx, boundaryy, color = 'g')
+    plt.plot(boundaryx, yup, linestyle='--', color='g')
+    plt.plot(boundaryx, ydown, linestyle='--', color='g')
+    plt.scatter(res0[0], res0[1], c='b')
+    plt.scatter(res1[0], res1[1], c='r')
+    plt.title(title+ ' ' + str('c='+str(para)))
+    plt.show()
+    return res
+def poltboundary(data,title):
+    color = ['b','y','r','g']
+    count = 0
+    for i in [1.0,0.1,0.01,0.001]:
+        # i represent different c value
+        x,y = cleandata(data)
+        divisor = svm.SVC(C=i, kernel='linear')
+        divisor.fit(x, y)
+        coef1 = divisor.coef_[0]
+        coef2 = divisor.intercept_[0]
+        margin = 1/np.sqrt((np.sum(divisor.coef_**2)))
+        res = [[], []]
+        for j in range(len(x)):
+            res[0].append(x[j][0])
+            res[1].append(x[j][1])
+        boundaryx = np.linspace(min(res[0]), max(res[0]))
+        boundaryy = -(coef1[0] / coef1[1]) * boundaryx - coef2 / coef1[1]
+        yup = boundaryy + np.sqrt(1 + (-(coef1[0] / coef1[1])) ** 2) * margin
+        ydown = boundaryy - np.sqrt(1 + (-(coef1[0] / coef1[1])) ** 2) * margin
+        plt.plot(boundaryx, boundaryy,color = color[count],label = str('c=' + str(i)))
+        plt.plot(boundaryx, yup,linestyle = '--',color = color[count])
+        plt.plot(boundaryx, ydown,linestyle = '--',color = color[count])
+        count += 1
+    plt.title(title)
+    plt.legend()
+    plt.show()
+    return 0
+#svmdef(data1,1.0)
+'''
+svmdef(data1,1.0,'dataset1')
+svmdef(data1,0.1,'dataset1')
+svmdef(data1,0.01,'dataset1')
+svmdef(data1,0.001,'dataset1')
+svmdef(data2,1.0,'dataset2')
+svmdef(data2,0.1,'dataset2')
+svmdef(data2,0.01,'dataset2')
+svmdef(data2,0.001,'dataset2')
+
+poltboundary(data1,'dataset1')
+poltboundary(data2,'dataset2')
+'''
+#question2
+q2data1 = importdata('classA.csv')
+q2data2 = importdata('classB.csv')
+def dataplot(data1,data2):
+    res1 = [[],[]]
+    res2 = [[],[]]
+    for i in range (len(data1)-1):
+        res1[0].append(data1[i][0])
+        res1[1].append(data1[i][1])
+    for j in range (len(data2)-1):
+        res2[0].append(data2[j][0])
+        res2[1].append(data2[j][1])
+    plt.scatter(res1[0],res1[1],c='b',label = 'classA')
+    plt.scatter(res2[0],res2[1],c='r',label = 'classB')
+    plt.legend()
+    plt.show()
+#dataplot(q2data1,q2data2)
+def vaild(testatt,testlabel,vaildattr,vaildlabel,para):
+    count = 0
+    divisor = svm.SVC(C=para, kernel='linear')
+    divisor.fit(testatt, testlabel)
+    res = divisor.predict(vaildattr)
+    for i in range (len(res)):
+        if vaildlabel[i] == res[i]:
+            count += 1
+    return count/len(res)
+def cleandata(data1, data2):
+    x = []
+    # set data1's attributes to be 0, data2 to be 1
+    for i in data1:
+        if len(i) == 0:
+            continue
+        x.append([i[0],i[1],0])
+    for i in data2:
+        if len(i) == 0:
+            continue
+        x.append([i[0],i[1],1])
+    return x
+def plotbounary(testatt,testlabel,vaildatt, vaildlabel, para):
+    divisor = svm.SVC(C=para, kernel='linear')
+    divisor.fit(testatt, testlabel)
+    res = divisor.predict(vaildatt)
+    coef1 = divisor.coef_[0]
+    coef2 = divisor.intercept_[0]
+    margin = 1 / np.sqrt((np.sum(divisor.coef_ ** 2)))
+    #calculate the index of margin
+    res0 = [[], []]
+    res1 = [[], []]
+    count = 0
+    for i in range(len(res)):
+        if vaildlabel[i] == res[i]:
+            count += 1
+        if res[i] == 1:
+            res1[0].append(vaildatt[i][0])
+            res1[1].append(vaildatt[i][1])
+        else:
+            res0[0].append(vaildatt[i][0])
+            res0[1].append(vaildatt[i][1])
+    boundaryx = np.linspace(200, 500)
+    boundaryy = -(coef1[0] / coef1[1]) * boundaryx - coef2 / coef1[1]
+    yup = boundaryy + np.sqrt(1 + (-(coef1[0] / coef1[1])) ** 2) * margin
+    ydown = boundaryy - np.sqrt(1 + (-(coef1[0] / coef1[1])) ** 2) * margin
+    plt.plot(boundaryx, yup, linestyle='--', color='g')
+    plt.plot(boundaryx, ydown, linestyle='--', color='g')
+    plt.plot(boundaryx, boundaryy, c = 'g')
+    plt.scatter(res0[0], res0[1], c='b')
+    plt.scatter(res1[0], res1[1], c='r')
+    plt.title(' C = %s'%para)
+    plt.show()
+    return count/len(vaildlabel)
+def floder(data,para):
+    final = []
+    for k in range (10):
+        random.shuffle(data)
+        # randomize the data
+        alllabel = []
+        allattri = []
+        for i in range (len(data)):
+            allattri.append([data[i][0],data[i][1]])
+            alllabel.append(data[i][2])
+        #divided the attributes and label
+        divideattri = [allattri[i:i + (len(data) // 10)] for i in range(10)]
+        dividelabel = [alllabel[i:i + (len(data) // 10)] for i in range(10)]
+        # divide the dataset into 10 pieces
+        accur = 0
+        for i in range (10):
+            testattri = []
+            testlabel = []
+            for j in range (10):
+                if j != i and len(divideattri[j]) != 0:
+                    testattri += divideattri[j]
+                if j != i and len(dividelabel[j]) != 0:
+                    testlabel += dividelabel[j]
+            #from the training set
+            vaildattr = divideattri[i]
+            vaildlabel = dividelabel[i]
+            accur += vaild(testattri,testlabel,vaildattr,vaildlabel,para)
+            if i == 0 and k == 0:
+                plotbounary(testattri,testlabel,allattri,alllabel, para)
+        final.append(accur/10)
+    return final, sum(final)/10
+dataall = cleandata(q2data1,q2data2)
+#print(floder(dataall,1))
+
+#print(floder(dataall, 0.1))
+#print(floder(dataall, 1))
+#print(floder(dataall, 10))
+#print(floder(dataall, 100))
+
+def adaboostm1(testattri, testlab):
+    t = 0
+    w = [1/len(testattri)] * len(testattri)
+    # Equally initialize the weight of each matrix
+    betalist = []
+    res = []
+    while t < 50:
+        wtrain = []
+        index = random.sample(range(0, len(testattri)), 100)
+        # generate 100 index randomly as the training set
+        testatt, testlabel = [], []
+        for i in range(100):
+            testatt.append(testattri[index[i]])
+            # Add the data according to the generated index list
+            testlabel.append(testlab[index[i]])
+            wtrain.append(w[index[i]])
+            # update the weight of each feature accordingly
+        divisor = svm.SVC(C=0.1, kernel='linear',random_state=0)
+        divisor.fit(testatt, testlabel, sample_weight=wtrain)
+        # create the classifier according to the weight list
+        result_of_pred = divisor.predict(testatt)
+        correctindex = [wtrain[i] if result_of_pred[i] != testlabel[i] else 0 for i in range(len(testlabel))]
+        # check which sample is predicted correctly
+        error = sum(correctindex)
+        if error > 0.5:
+            return adaboostm1(testattri, testlab)
+            # if error is larger than 50%, repeat the whole adaboost again
+        beta = error/(1-error)
+        betalist.append(beta)
+        #update the beta list
+        for i in range(len(correctindex)):
+            if correctindex[i] == 0:
+                w[index[i]] = w[index[i]] * beta
+                # if predict correctly , update the weight
+        t += 1
+        sumw = sum(w)
+        w = [w[i]/sumw for i in range (len(w))]
+        # normalize the weight
+        res.append(divisor)
+    return betalist, res
+def everypoint(test, clf ,weight):
+    # this function is used to plot the decision boundary
+    resbou = []
+    xmax = max(list(zip(*test))[0])-30
+    xmin = min(list(zip(*test))[0])
+    ymax = max(list(zip(*test))[1])+15
+    ymin = min(list(zip(*test))[1])
+    # get the range of x and y, generating the coordinate of the whole coordinate plane
+    x, y = np.meshgrid(np.arange(xmin, xmax, 8), np.arange(ymin, ymax, 7))
+    all = np.c_[x.ravel(), y.ravel()]
+    for i in all:
+        vote = [0, 0]
+        for j in range(len(clf)):
+            single_divisor_result = (clf[j].predict([i]))[0]
+#            resbou.append(single_divisor_result)
+            if weight[j] == 0:
+                continue
+            if single_divisor_result == 0:
+                vote[0] -= math.log(weight[j])
+            else:
+                vote[1] -= math.log(weight[j])
+        if vote[0] > vote[1]:
+            resbou.append(0)
+        else:
+            resbou.append(1)
+    # using the Adaboost-M1 method to get the result
+    return x, y, resbou
+def returnresult(test, vaild, clf ,weight):
+    # the function is used to get the accuracy of the classifier
+    res = []
+    count = 0
+    for i in range(len(test)):
+        vote = [0,0]
+        for j in range (len(clf)):
+        # go thourgh each classifier get the result for the same point
+            single_divisor_result = (clf[j].predict([test[i]]))[0]
+            if weight[j] == 0:
+                continue
+            if single_divisor_result== 0:
+                vote[0] -= math.log(weight[j])
+                # calculate the weight for each label.
+            else:vote[1] -= math.log(weight[j])
+        if vote[0] > vote[1]:
+            res.append(0)
+        else:res.append(1)
+    for i in range (len(vaild)):
+        if res[i] == vaild[i]:
+            count +=1
+    # get the accuracy
+    return count / (len(test)), res
+def decisionboundary(test, vaild, clf, weight):
+    # plot the predicted result and the decision boundary
+    a, predictres = returnresult(test, vaild, clf, weight)
+    res1 = [[],[]]
+    res0 = [[],[]]
+    for i in range(len(predictres)):
+        if predictres[i] == 1:
+            res1[0].append(test[i][0])
+            res1[1].append(test[i][1])
+        else:
+            res0[0].append(test[i][0])
+            res0[1].append(test[i][1])
+    plt.scatter(res0[0], res0[1], c='b')
+    plt.scatter(res1[0], res1[1], c='r')
+    x, y, ans = everypoint(test,clf,weight)
+    ans = np.array(ans)
+    ans = ans.reshape(x.shape)
+    plt.contour(x, y, ans)
+    plt.show()
+def vaild2(data):
+    #using 10-times-10folds to get the average accuracy
+    final = []
+    for k in range (10):
+        random.shuffle(data)
+        # randomize the data
+        alllabel = []
+        allattri = []
+        for i in range(len(data)):
+            allattri.append([data[i][0], data[i][1]])
+            alllabel.append(data[i][2])
+        # divided the attributes and label
+        divideattri = [allattri[i:i + (len(data) // 10)] for i in range(10)]
+        dividelabel = [alllabel[i:i + (len(data) // 10)] for i in range(10)]
+        # divide the dataset into 10 pieces
+        accur = []
+        for i in range(10):
+            testattri = []
+            testlabel = []
+            for j in range(10):
+                if j != i and len(divideattri[j]) != 0:
+                    testattri += divideattri[j]
+                if j != i and len(dividelabel[j]) != 0:
+                    testlabel += dividelabel[j]
+            vaildattr = divideattri[i]
+            vaildlabel = dividelabel[i]
+            w, clf= adaboostm1(testattri, testlabel)
+            accu, predres = returnresult(vaildattr, vaildlabel, clf, w)
+            accur.append(accu)
+        final.append(sum(accur)/10)
+    w, clf = adaboostm1(allattri, alllabel)
+    decisionboundary(allattri, alllabel, clf, w)
+    return final, np.var(final),sum(final)/10
+#print(vaild2(dataall))
+
+# project
+def importdata2(loc,loc2):
+    with open(loc) as f:
+        read_data = f.read()
+        a = read_data.split()
+        data = [[]]
+        feature = 0
+        for i in range (len(a)):
+            if len(a[i]) == 0:
+                continue
+            data[-1].append(float(a[i]))
+            feature += 1
+            if feature == 561:
+                data.append([])
+                feature = 0
+    with open(loc2) as file:
+        read_data = file.read()
+        b = read_data.split()
+        label = []
+        for i in range(len(b)):
+            if len(b[i]) == 0:
+                continue
+            label.append(int(b[i]))
+            feature += 1
+        data.pop()
+        return data,label
+project_data, project_label = importdata2('UCI HAR Dataset/train/X_train.txt','UCI HAR Dataset/train/y_train.txt')
+test_data, test_label = importdata2('UCI HAR Dataset/test/X_test.txt','UCI HAR Dataset/test/y_test.txt')
+#print(len(project_data),len(project_label))
+
+def classify(train_data, train_label, test_data, test_label, para):
+    clf = RandomForestClassifier(n_estimators= 75, max_features= 'log2', max_depth= 10)
+    clf.fit(train_data,train_label)
+    predict_res = clf.predict(test_data)
+    count = 0
+    confusion_matrix = [[0] * 6 for i in range (6)]
+    #build the confusion matrix
+    for i in range (len(test_label)):
+        confusion_matrix[test_label[i]-1][predict_res[i]-1] += 1
+        if test_label[i] == predict_res[i]:
+            count += 1
+    return  count/len(test_label), confusion_matrix
+def selectfeature2(train,test,n):
+    # this uses a enabled feature importance function of random forest
+    clf = RandomForestClassifier(n_estimators=75, max_features='log2', max_depth=10)
+    clf.fit(train,test)
+    weight = clf.feature_importances_
+    # return the importance of each feature by the library function
+    index = list(np.argsort(-weight))[:n]
+    train1 = np.array(train)
+    train2 = train1[:,index]
+    return train2, index
+def selectfeature(train,test,n):
+    # This function is written by myself but runs slowly
+    clf = RandomForestClassifier(n_estimators=75, max_features='log2', max_depth=10)
+    clf.fit(train,test)
+    actual_res = clf.predict(train)
+    errorlist = []
+    for i in range (len(train[0])):
+        train_addnoise = copy.deepcopy(train)
+        # update the train data to origin
+        count = 0
+        for j in range (len(train)):
+            train_addnoise[j][i] += random.gauss(0,1)
+            #add the noise
+        pred_res = clf.predict(train_addnoise)
+        for k in range (len(pred_res)):
+            if pred_res[k] != actual_res[k]:
+                count += 1
+        errorlist.append(count)
+        # add the number of misclassification
+    errorlist = np.array(errorlist)
+    index = list(np.argsort(-errorlist))[:n]
+    # select the number with the highest classification
+    train1 = np.array(train)
+    train2 = train1[:,index]
+    return train2, index
+def vaild3(data,label,para):
+    final = []
+    for k in range (10):
+        index = [i for i in range(len(data))]
+        random.shuffle(index)
+        # randomize the data
+        alllabel = []
+        allattri = []
+        for i in range(len(index)):
+            allattri.append(data[index[i]])
+            alllabel.append(label[index[i]])
+        # divided the attributes and label
+        divideattri = [allattri[i:i + (len(data) // 10)] for i in range(10)]
+        dividelabel = [alllabel[i:i + (len(data) // 10)] for i in range(10)]
+        res = []
+        for i in range(10):
+            testattri = []
+            testlabel = []
+            for j in range(10):
+                if j != i and len(divideattri[j]) != 0:
+                    testattri += divideattri[j]
+                if j != i and len(dividelabel[j]) != 0:
+                    testlabel += dividelabel[j]
+            vaildattr = divideattri[i]
+            vaildlabel = dividelabel[i]
+            accurancy , con_matrix = classify(testattri, testlabel, vaildattr, vaildlabel, para)
+            res.append(accurancy)
+        final.append(sum(res)/10)
+    return sum(final)/10
+
+trainsetnew, index = selectfeature(project_data[:10000], project_label[:10000],300)
+print(index)
+testnew = np.array(test_data)[:,index]
+print(classify(trainsetnew[:10000],project_label[:10000],testnew, test_label,10))
+print(classify(project_data[:10000],project_label[:10000],test_data, test_label,10))
+'''
+for i in [2,5,10,20,50,100]:
+    print(vaild3(project_data,project_label,i))
