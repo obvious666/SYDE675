@@ -1,0 +1,657 @@
+import numpy as np
+import random
+import math
+import copy
+import  matplotlib.pyplot as plt
+def importdata(loc):
+# to import the data form the local file
+    with open(loc) as f:
+        read_data = f.read()
+        a = read_data.split()
+        data = [[]]
+        for i in range (len(a)):
+            data[i]+=(a[i].split(','))
+            data.append([])
+        return data
+def calentropy(data):
+    # create a dictionary to calculate the entropy for different classes
+    dicres = {}
+    for a in data:
+        if len(a) == 0:
+    # if data a is empty then do not calculate
+            continue
+        tag = a[-1]
+    # choosing the class label to calculate the number of each label
+        if tag not in dicres:
+            dicres[tag] = 0
+        dicres[tag] += 1
+    entropy = 0.0
+    for b in dicres:
+        entropy += (dicres[b]/len(data)) * (-math.log(dicres[b]/len(data)))
+        # calculate the entropy
+    return entropy
+def selectthelargest(data):
+    # select the label which has the largest number of occurrence
+    dic = {}
+    res = 0
+    for i in data:
+        if i[-1] not in dic:
+            dic[i[-1]] = 0
+        dic[i[-1]] += 1
+    for j in dic:
+        if dic[j] > res:
+            res = dic[j]
+            lab = j
+    return lab
+def extracttable(alldata,feature,attr):
+    # select the data whose selected feature does not match the given value
+    table = []
+    for i in alldata:
+        if len(i) == 0:
+    # if the selected feature's value matches that of give, then it is not added
+            continue
+        if i[feature] == attr:
+            table.append(i[:feature] + i[feature+1:])
+    return table
+def getthefeature(data):
+    # select the feature with largest information gain from the dataset
+    largestlg = 0
+    res = None
+    entropyall = calentropy(data)
+    for i in range (len(data[0])-1):
+        atrlist = []
+        for j in data:
+            if len(j) == 0:
+                continue
+            atrlist += j[i]
+        atrlist = set(atrlist)
+    # get the set of feature i's possible value
+        entropysin = 0
+        for k in atrlist:
+            newlist = extracttable(data,i,k)
+            entropysin += len(newlist)/len(data) * calentropy(newlist)
+        ig = entropyall - entropysin
+    # get the information gain
+        if ig > largestlg:
+            largestlg = ig
+            res = i
+    # select feature i with the highest information gain
+    if res == None:
+        return random.randint(0,len(data[0])-1)
+    # if all features have the same information gain just choose one randomly
+    return res
+def decisiontree(data,label,count):
+    labelnew = label.copy()
+    attrlist = []
+    for i in data:
+        if len(i) == 0:
+            continue
+        attrlist.append(i[-1])
+    setatt = set(attrlist)
+    # get the set of all labels
+    if len(setatt) == 1:
+        return attrlist[0]
+    # if there is only one label just return the only label
+    if len(data[0]) == 1:
+        return selectthelargest(data)
+    # if all the fatures has been selected but the data has contradictory exmaples
+    # return the one with the maximum number of occurrence
+    indexoffe = getthefeature(data)
+    # get the feature with the largest information gain
+    featlabel = labelnew[indexoffe]
+    labelnew.remove(featlabel)
+    # remove the select feature from the dataset
+    feaval = []
+    for j in range (len(data)):
+        if len(data[j]) == 0:
+            continue
+        feaval.append(data[j][indexoffe])
+    setoffe = set(feaval)
+    # get the the value of the feature with the largest IG
+    tree = {featlabel:{}}
+    for k in setoffe:
+        labelnew1 = labelnew.copy()
+        newtale = extracttable(data,indexoffe,k)
+        if count >= len(label) * 0.6:
+            return tree
+        # get the new table withou the selected feature
+        tree[featlabel][k] = decisiontree(newtale,labelnew1, count + 1)
+    # use recursion to add nodes to the tree
+    return tree
+def classfy(tree, feature, value):
+    # use the value to classify the final result under the decision tree
+    prifea = list(tree.keys())[0]
+    # get the feature at the top of the decision tree
+    index = 0
+    res = None
+    for i in range (len(feature)):
+        if feature[i] == prifea:
+            index = i
+            break
+    # get the index of the top feature
+    featurevalue = value[index]
+    # get the value under the top feature
+    subtree = tree[prifea]
+    # subtree is the current feature under the top feature
+    for j in subtree:
+        if featurevalue == j:
+            # if the value of the selected feature is the same as that of the node of the tree
+            if isinstance(subtree[j], dict):
+                res = classfy(subtree[j], feature, value)
+    # to justify if this node is the lef of the tree
+            else:
+                res = subtree[j]
+    # if the node is the leaf, just choose the value
+    if res == None:
+        l = ['positive', 'negative']
+        return random.choice(l)
+    return res
+def vaild(data,label):
+    # divide the dataset into 10 pieces
+    reslist = []
+    for k in range (10):
+        a1 = a2 = a3 = a4 = 0
+        # for the 10-times-10-fold cross validation
+        random.shuffle(data)
+        # randomize the data
+        divideset = [data[i:i+(len(data)//10)] for i in range (10)]
+        cout = []
+        for i in range (10):
+            tem = 0
+            vaildset = divideset[i]
+            cal = 0
+            # choose the vaild set from 1st to 10th
+            trainset = []
+            for j in range (10):
+                if j != i and len(divideset[j]) != 0:
+                    trainset += divideset[j]
+            # choose the rest of the set as the training set
+            tree = decisiontree(trainset,label,0)
+            # construct the decision tree using the training data
+            for node in vaildset:
+                cal += 1
+                if len(node) <= 1:
+                    continue
+                trueres = node[-1]
+                if len(node) != 0:
+                    res = classfy(tree,label,node[:-1])
+                    if trueres == 'positive' and res == 'positive':
+                        a1 += 1
+                    elif trueres == 'positive' and res == 'negative':
+                        a2 += 1
+                    elif trueres == 'negative' and res == 'positive':
+                        a3 += 1
+                    elif trueres == 'negative' and res == 'negative':
+                        a4 += 1
+                    if res == trueres:
+                        tem += 1
+                  # calucute the number of correct prediction
+            cout.append(tem/cal)
+        count = sum(cout) / 10
+        reslist.append(count)
+    confmatrix = [a1,a2,a3,a4]
+    return reslist, confmatrix
+
+#q2 for dataset Tic-Tac-Toe Endgame
+data = importdata('tic-tac-toedata.txt')
+label = ['11','12','13','21','22','23','31','32','33']
+print(vaild(data,label))
+
+#for dataset winedata
+
+def dealdata(data):
+    # there is a '0' missing in the 9th of the data
+    data2 = []
+    for i in data:
+        if len(i) == 0:
+            continue
+        i[8] = str(float('0'+i[8]))
+        data2.append(i[1:len(i)] + [i[0]])
+    return data2
+def calculatethrehold(data,feature):
+    # to decided which break point is the best for the feature
+    extfeat = []
+    basicthrohold = []
+    igorig = 0
+    for j in data:
+        extfeat.append([float(j[feature]),j[13]])
+        # get the label and appointed feature's value of the data
+    extfeat.sort(key = lambda x :(x[0]))
+    # sort the data according to the value of the select feature
+    for k in range (0,len(extfeat)-1,len(extfeat)//2):
+        basicthrohold.append(round((extfeat[k][0] + extfeat[k+1][0])/2,2))
+    # build a list of breakpoint's choices according to the average of the two neighbor values
+    for i in basicthrohold:
+        tableedit = []
+        for j in range (len(extfeat)):
+            if extfeat[j][0] < i:
+                tableedit.append([0,extfeat[j][1]])
+            # discrete the data using the breakpoint, if larger using '1' otherwise '0'
+            else:
+                tableedit.append([1,extfeat[j][1]])
+        entrop = 0
+        entroporig = calentropy(tableedit)
+        datasplit0 = extracttable(tableedit,0,0)
+        datasplit1 = extracttable(tableedit,0,1)
+        entrop += (len(datasplit0)/len(data)) * calentropy(datasplit0)
+        entrop += (len(datasplit1)/len(data)) * calentropy(datasplit1)
+        # calculate the information gain
+        ig = entroporig - entrop
+        if ig > igorig:
+            igorig = ig
+            feasele = i
+        # choose one with the largest information gain
+    return feasele
+def discreate(data):
+    threhold = []
+    discrtable = []
+    for i in range (len(data[0])-1):
+        threhold.append(calculatethrehold(data,i))
+    # append the breakpoint with the largest IG under each feature in a list
+    for j in data:
+        res = []
+        for k in range (len(j)-1):
+            if float(j[k]) < threhold[k]:
+                res += '0'
+            else:
+                res += '1'
+        # if larger than the breakpoint using '1', otherwise '0'
+        res += j[-1]
+        discrtable.append(res)
+    return discrtable
+def classfy2(tree, feature, value):
+    # use the value to classify the final result under the decision tree
+    prifea = list(tree.keys())[0]
+    # get the feature at the top of the decision tree
+    index = 0
+    res = None
+    for i in range (len(feature)):
+        if feature[i] == prifea:
+            index = i
+            break
+    # get the index of the top feature
+    featurevalue = value[index]
+    # get the value under the top feature
+    subtree = tree[prifea]
+    # subtree is the current feature under the top feature
+    for j in subtree:
+        if featurevalue == j:
+            # if the value of the selected feature is the same as that of the node of the tree
+            if isinstance(subtree[j], dict):
+                res = classfy(subtree[j], feature, value)
+    # to justify if this node is the lef of the tree
+            else:
+                res = subtree[j]
+    # if the node is the leaf, just choose the value
+    if res == None:
+        l = ['1', '2','3']
+        return random.choice(l)
+    return res
+def vai(data,label):
+    # divide the dataset into 10 pieces
+    reslist = []
+    for k in range (10):
+        a1 = a2 = a3 = a4 = a5 = a6 = a7 = a8 = a9 = 0
+        # for the 10-times-10-fold cross validation
+        random.shuffle(data)
+        # randomize the data
+        divideset = [data[i:i+(len(data)//10)] for i in range (10)]
+        cout = []
+        for i in range (10):
+            tem = 0
+            vaildset = divideset[i]
+            cal = 0
+            # choose the vaild set from 1st to 10th
+            trainset = []
+            for j in range (10):
+                if j != i and len(divideset[j]) != 0:
+                    trainset += divideset[j]
+            # choose the rest of the set as the training set
+            tree = decisiontree(trainset,label,0)
+            # construct the decision tree using the training data
+            for node in vaildset:
+                cal += 1
+                if len(node) <= 1:
+                    continue
+                trueres = node[-1]
+                if len(node) != 0:
+                    res = classfy2(tree,label,node[:-1])
+                    if trueres == '1' and res == '1':
+                        a1 += 1
+                    elif trueres == '1' and res == '2':
+                        a2 += 1
+                    elif trueres == '1' and res == '3':
+                        a3 += 1
+                    elif trueres == '2' and res == '1':
+                        a4 += 1
+                    elif trueres == '2' and res == '2':
+                        a5 += 1
+                    elif trueres == '2' and res == '3':
+                        a6 += 1
+                    elif trueres == '3' and res == '1':
+                        a7 += 1
+                    elif trueres == '3' and res == '2':
+                        a8 += 1
+                    else:
+                        a9 += 1
+                    if res == trueres:
+                        tem += 1
+                  # calucute the number of correct prediction
+            cout.append(tem/cal)
+        count = sum(cout) / 10
+        reslist.append(count)
+    confmatrix = [a1,a2,a3,a4,a5,a6,a7,a8,a9]
+    return reslist, confmatrix
+data2 = dealdata(importdata('winedata.txt'))
+label2 = ['Alcohol','Malic acid','Ash','Alcalinity of ash','Magnesium','Total phenols','Flavanoids','Nonflavanoid phenols','Proanthocyanins','Color intensity','Hue','OD280/OD315 of diluted wines','Proline']
+data3 = discreate(data2)
+print(vai(data3,label2))
+'''
+#q2b using the gain ratio to build a tree
+def getfeaturebygain (data):
+    largestgainratio = 0
+    res = None
+    entropyall = calentropy(data)
+    for i in range (len(data[0])-1):
+        atrlist = []
+        for j in data:
+            if len(j) == 0:
+                continue
+            atrlist += j[i]
+        atrlist = set(atrlist)
+        entropysin = 0
+        splitinfo = 0
+        for k in atrlist:
+            newlist = extracttable(data,i,k)
+            entropysin += len(newlist)/len(data) * calentropy(newlist)
+            splitinfo -= len(newlist)/len(data) * (math.log(len(newlist)/len(data)))
+        ig = entropyall - entropysin
+        gainratio = ig/splitinfo
+        if gainratio > largestgainratio:
+            largestgainratio = gainratio
+            res = i
+    return res
+def decisiontree2(data,label):
+    labelnew = label.copy()
+    attrlist = []
+    for i in data:
+        if len(i) == 0:
+            continue
+        attrlist.append(i[-1])
+    setatt = set(attrlist)
+    if len(setatt) == 1:
+        return attrlist[0]
+    if len(data[0]) == 1:
+        return selectthelargest(data)
+    indexoffe = getfeaturebygain(data)
+    featlabel = labelnew[indexoffe]
+    labelnew.remove(featlabel)
+    feaval = []
+    for j in range (len(data)):
+        if len(data[j]) == 0:
+            continue
+        feaval.append(data[j][indexoffe])
+    setoffe = set(feaval)
+    tree = {featlabel:{}}
+    for k in setoffe:
+        labelnew1 = labelnew.copy()
+        newtale = extracttable(data,indexoffe,k)
+        tree[featlabel][k] = decisiontree(newtale,labelnew1)
+    return tree
+def vaildq2(data,label):
+    random.shuffle(data)
+    divideset = [data[i:i+(len(data)//10)] for i in range (10)]
+    reslist = []
+    cal = 0
+    a1 = a2 = a3 = a4 = a5 = a6 = a7 = a8 = a9 = 0
+    for i in range (10):
+        count = 0
+        vaildset = divideset[i]
+        trainset = []
+        for j in range (10):
+            if j != i and len(divideset[j]) != 0:
+                trainset += divideset[j]
+        tree = decisiontree2(trainset,label)
+        for node in vaildset:
+            if len(node) == 0:
+                continue
+            cal += 1
+            trueres = node[-1]
+            if len(node) != 0:
+                res = classfy(tree,label,node[:-1])
+                if trueres == '1' and res == '1':
+                    a1 += 1
+                elif trueres == '1' and res == '2':
+                    a2 += 1
+                elif trueres == '1' and res == '3':
+                    a3 += 1
+                elif trueres == '2' and res == '1':
+                    a4 += 1
+                elif trueres == '2' and res == '2':
+                    a5 += 1
+                elif trueres == '2' and res == '3':
+                    a6 += 1
+                elif trueres == '3' and res == '1':
+                    a7 += 1
+                elif trueres == '3' and res == '2':
+                    a8 += 1
+                else:
+                    a9 += 1
+                if res == trueres:
+                    count += 1
+        reslist.append(count)
+    return reslist,[a1,a2,a3,a4,a5,a6,a7,a8,a9]
+#for data set Tic-Tac-Toe Endgame
+print(vaildq2(data,label))
+#for dataset winedata
+print(vaildq2(data3,label2))
+'''
+#question3
+#q3A
+def addattnoise(dataset, pct , type):
+    size = len(dataset) * (len(dataset[0])-1)
+    totalnoise = int(size * pct)
+    # calculate the total number of noises need to be added
+    for i in range (totalnoise):
+        index1 = random.randint(0,len(dataset)-2)
+        index2 = random.randint(0,len(dataset[0])-2)
+        # generate two random indexes of adding the noise
+        if type == 'cont':
+            # if the data type is continuous
+            dataset[index1][index2] = str(round(float(dataset[index1][index2]) + random.gauss(0,1),6))
+            # add the zero mean noise
+        elif len(dataset[index1]) != 0 :
+            # if the data is discrete replace the value with other two
+            if dataset[index1][index2] == 'o':
+                if random.randint(1, 2) == 1:
+                    # make sure the two errors have equal possibility of occurring
+                    dataset[index1][index2] = 'b'
+                else:
+                    dataset[index1][index2] = 'x'
+            elif dataset[index1][index2] == 'x':
+                if random.randint(1, 2) == 1:
+                    dataset[index1][index2] = 'o'
+                else:
+                    dataset[index1][index2] = 'b'
+            elif dataset[index1][index2] == 'b':
+                if random.randint(1,2) == 1:
+                    dataset[index1][index2] = 'o'
+                else:
+                    dataset[index1][index2] = 'x'
+    return dataset
+def vailddata(data1, type , label, condition):
+    pct = [0.05, 0.1, 0.15]
+    data = copy.deepcopy(data1)
+    resfinal = []
+    for i in pct:
+        random.shuffle(data)
+        divideset = [data[n:n + (len(data) // 10)] for n in range(10)]
+        # same as the 10-times-10-fold cross validation
+        reslist = []
+        cal = 0
+        for j in range(10):
+            count = 0
+            vaildsetorig = divideset[j]
+            trainsetorig = []
+            for k in range(10):
+                if k != j and len(divideset[k]) != 0:
+                    trainsetorig += divideset[k]
+            if condition == 'DC':
+                trainset = addattnoise(trainsetorig,i, type)
+                # if DC just addnoise to the training set
+                vaildset = copy.deepcopy(vaildsetorig)
+            elif condition == 'CC':
+                trainset = copy.deepcopy(trainsetorig)
+                vaildset = copy.deepcopy(vaildsetorig)
+            elif condition == 'CD':
+                trainset = copy.deepcopy(trainsetorig)
+                vaildset = addattnoise(vaildsetorig,i, type)
+            elif condition == 'DD':
+                trainset = addattnoise(trainsetorig,i,type)
+                vaildset = addattnoise(vaildsetorig,i,type)
+            if type =='cont':
+                # if the dataset is continuous make it discrete
+                trainset = discreate(trainset)
+                vaildset = discreate(vaildset)
+            tree = decisiontree(trainset,label)
+            for node in vaildset:
+                if len(node) == 0:
+                    continue
+                cal += 1
+                trueres = node[-1]
+                if len(node) != 0:
+                    res = classfy(tree, label, node[:-1])
+                    if res == trueres:
+                        count += 1
+            reslist.append(count/len(vaildset))
+        resfinal.append(np.mean(reslist))
+    return resfinal
+x1 = ['5%','10%','15%']
+'''
+plt.plot(x1,vailddata(data2,'cont',label2,'CC'),label='CC wine')
+plt.plot(x1,vailddata(data2,'cont',label2,'DC'),label='DC wine')
+plt.plot(x1,vailddata(data2,'cont',label2,'CD'),label='CD wine')
+plt.plot(x1,vailddata(data2,'cont',label2,'DD'),label='DD wine')
+plt.title('The accuracy in Three Conditions wine')
+plt.xlabel('percentage')
+plt.ylabel('accuracy')
+plt.legend()
+plt.savefig("1.png")
+plt.show()
+plt.plot(x1,vailddata(data,'disc',label2,'CC'),label='CC Tic-Tac')
+plt.plot(x1,vailddata(data,'disc',label2,'DC'),label='DC Tic-Tac')
+plt.plot(x1,vailddata(data,'disc',label2,'CD'),label='CD Tic-Tac')
+plt.plot(x1,vailddata(data,'disc',label2,'DD'),label='DD Tic-Tac')
+plt.title('The accuracy in Three Conditions Tic-Tac')
+plt.xlabel('percentage')
+plt.ylabel('accuracy')
+plt.legend()
+plt.savefig("2.png")
+plt.show()
+'''
+def addlabelnoise(data, pct ,type):
+    # add the class-label noise
+    size = len(data) * (len(data[0]) - 1)
+    totalnoise = int(size * pct)
+    label = []
+    for j in data:
+        if len(j) != 0:
+            label.append(j[-1])
+    labelset = list(set(label))
+    # generate the set of all label values
+    for i in range (totalnoise):
+        index = random.randint(0,len(data)-1)
+        if len(data[index]) == 0:
+            continue
+        newitem = data[index].copy()
+        ind = random.randint(0, len(labelset) - 1)
+        # randomly pick a value from all of these label values
+        temindex = labelset.index(newitem[-1])
+        # get the index of the current label value
+        if ind == temindex:
+            ind = random.randint(0, len(labelset) - 1)
+        # if the generated noise label value is the same that of  the current then generate a new one
+        if type == 'contra':
+            newitem[-1] = labelset[ind]
+            data.append(newitem)
+        # if the input noise type is Contradictory examples then just add a same data with a new label value
+        else:
+            data[index][-1] = labelset[ind]
+        # if it's Misclassifications just change the label value directly
+    return data
+def vailddata2(data1, type , label, condition):
+    # vaildation period the same as before
+    pct = [0.05, 0.1, 0.15]
+    data = copy.deepcopy(data1)
+    resfinal = []
+    for i in pct:
+        random.shuffle(data)
+        divideset = [data[n:n + (len(data) // 10)] for n in range(10)]
+        reslist = []
+        cal = 0
+        for j in range(10):
+            count = 0
+            vaildsetorig = divideset[j]
+            trainsetorig = []
+            for k in range(10):
+                if k != j and len(divideset[k]) != 0:
+                    trainsetorig += divideset[k]
+            if condition == 'DC':
+                trainset = addlabelnoise(trainsetorig,i, type)
+                vaildset = copy.deepcopy(vaildsetorig)
+            elif condition == 'CC':
+                trainset = copy.deepcopy(trainsetorig)
+                vaildset = copy.deepcopy(vaildsetorig)
+            elif condition == 'CD':
+                trainset = copy.deepcopy(trainsetorig)
+                vaildset = addlabelnoise(vaildsetorig,i, type)
+            elif condition == 'DD':
+                trainset = addlabelnoise(trainsetorig,i,type)
+                vaildset = addlabelnoise(vaildsetorig,i,type)
+            if type =='cont':
+                trainset = discreate(trainset)
+                vaildset = discreate(vaildset)
+            tree = decisiontree(trainset,label)
+            for node in vaildset:
+                if len(node) == 0:
+                    continue
+                cal += 1
+                trueres = node[-1]
+                if len(node) != 0:
+                    res = classfy(tree, label, node[:-1])
+                    if res == trueres:
+                        count += 1
+            reslist.append(count/len(vaildset))
+        resfinal.append(np.mean(reslist))
+    return resfinal
+'''
+plt.plot(x1,vailddata2(data2,'contra',label2,'DC'),label='DC wine Contradictory examples')
+plt.plot(x1,vailddata2(data2,'mis',label2,'DC'),label='DC wine Misclassifications')
+plt.plot(x1,vailddata2(data2,'contra',label2,'CC'), label='CC wine Contradictory examples')
+plt.plot(x1,vailddata2(data2,'mis',label2,'CC'), label='CC wine Misclassifications')
+plt.plot(x1,vailddata2(data2,'contra',label2,'CD'),label='CD Wine Contradictory examples')
+plt.plot(x1,vailddata2(data2,'mis',label2,'CD'),label='CD Wine Misclassifications')
+plt.plot(x1,vailddata2(data2,'contra',label2,'DD'),label='DD wine Contradictory examples')
+plt.plot(x1,vailddata2(data2,'mis',label2,'DD'),label='DD wine Misclassifications')
+plt.title('The accuracy of wine')
+plt.xlabel('percentage')
+plt.ylabel('accuracy')
+plt.legend()
+plt.savefig("3.png")
+plt.show()
+
+plt.plot(x1,vailddata2(data,'contra',label,'DC'),label='DC Tic-Tac Contradictory examples')
+plt.plot(x1,vailddata2(data,'mis',label,'DC'),label='DC Tic-Tac Misclassifications')
+plt.plot(x1,vailddata2(data,'contra',label,'CC'), label='CC Tic-Tac Contradictory examples')
+plt.plot(x1,vailddata2(data,'mis',label,'CC'), label='CC Tic-Tac Misclassifications')
+plt.plot(x1,vailddata2(data,'contra',label,'CD'),label='CD Tic-Tac Contradictory examples')
+plt.plot(x1,vailddata2(data,'mis',label,'CD'),label='CD Tic-Tac Misclassifications')
+plt.plot(x1,vailddata2(data,'contra',label,'DD'),label='DD Tic-Tac Contradictory examples')
+plt.plot(x1,vailddata2(data,'mis',label,'DD'),label='DD Tic-Tac Misclassifications')
+plt.title('The accuracy of Tic-Tac')
+plt.xlabel('percentage')
+plt.ylabel('accuracy')
+plt.legend()
+plt.savefig("4.png")
+plt.show()
+'''
